@@ -46,33 +46,42 @@ def verify_signature(signature, body):
     Vérifie la signature de la requête webhook.
     """
     try:
-        # Extraire le timestamp et la signature de l'en-tête
-        parts = dict(part.split("=") for part in signature.split(","))
+        if not signature:
+            logging.error("Aucune signature reçue")
+            return False
+
+        # Nettoyer et parser la signature
+        parts = dict(part.strip().split("=") for part in signature.split(",") if "=" in part)
+
+        if "t" not in parts or "v1" not in parts:
+            logging.error("Format de signature invalide")
+            return False
+
         timestamp = parts["t"]
         received_signature = parts["v1"]
 
+        # Vérifier si timestamp est un entier valide
+        try:
+            timestamp = int(timestamp)
+        except ValueError:
+            logging.error("Timestamp non valide")
+            return False
+
         # Préparer la chaîne à signer
-        body_to_sign = f"{timestamp}.{body}".encode()
+        body_to_sign = f"{timestamp}.{body.decode('utf-8')}".encode()
 
         # Calculer la signature attendue
         expected_signature = hmac.new(SECRET.encode(), body_to_sign, hashlib.sha256).hexdigest()
 
-        # Comparer les signatures (en utilisant une comparaison constante pour éviter les attaques par timing)
+        # Comparer les signatures en évitant les attaques par timing
         if not hmac.compare_digest(expected_signature, received_signature):
-            return False
-
-        # Vérifier que le timestamp n'est pas trop ancien (max 30 secondes)
-        current_time = datetime.datetime.utcnow()
-        message_time = datetime.datetime.fromtimestamp(int(timestamp))
-        time_delta = (current_time - message_time).total_seconds()
-
-        if time_delta > 30:
+            logging.error("Signature invalide")
             return False
 
         return True
 
     except Exception as e:
-        print(f"Erreur lors de la vérification de la signature : {e}")
+        logging.error(f"Erreur lors de la vérification de la signature : {e}")
         return False
 
 @app.route('/')
@@ -89,11 +98,10 @@ def webhook():
     if not signature:
         return jsonify({"error": "Signature manquante"}), 400
 
-    #body = request.get_data(as_text=True)
-
     # Vérifier la signature
-    #if not verify_signature(signature, body):
-    #    return jsonify({"error": "Signature invalide"}), 401
+    body = request.get_data()
+    if not verify_signature(signature, body):
+        return jsonify({"error": "Signature invalide"}), 401
 
     # Traiter les données du webhook
     data = request.json
@@ -104,6 +112,19 @@ def webhook():
 
     # Répondre avec un succès
     return jsonify({"status": "success"}), 200
+
+@app.route('/tickets', methods=['GET'])
+def get_tickets():
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, ticket_number, event_name, buyer_name FROM tickets")
+        tickets = cursor.fetchall()
+        conn.close()
+        return jsonify([{"id": t[0], "ticket_number": t[1], "event_name": t[2], "buyer_name": t[3]} for t in tickets]), 200
+    except Exception as e:
+        logging.error(f"Erreur lors de la récupération des tickets : {e}")
+        return jsonify({"error": "Erreur interne"}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -4,9 +4,10 @@ services:
     build: .
     ports:
       - "5000:5000"
+    env_file:
+      - .env
     environment:
       - FLASK_ENV=development
-      - PETZI_SECRET=super_secret_key
     depends_on:
       - db
   db:
