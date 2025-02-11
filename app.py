@@ -1,14 +1,43 @@
 # Serveur Flask qui écoutera les requêtes POST du webhook
-import os
 from flask import Flask, request, jsonify
 import hmac
 import hashlib
 import datetime
+import psycopg2
 
 app = Flask(__name__)
 
 # Clé secrète partagée avec Petzi (à configurer dans l'interface Petzi)
-SECRET = os.getenv("PETZI_SECRET", "default_secret")  # Valeur par défaut en cas d'absence
+# SECRET = os.getenv("PETZI_SECRET", "default_secret")  # Valeur par défaut en cas d'absence
+SECRET = "AEeyJhbGciOiJIUzUxMiIsImlzcyI6"
+
+# Configuration de la base de données
+DB_CONFIG = {
+    "dbname": "petzi_db",
+    "user": "user",
+    "password": "password",
+    "host": "db",  # "db" est le nom du service dans docker-compose.yml
+    "port": "5432"
+}
+
+
+def save_to_db(data):
+    """
+    Sauvegarde les données du webhook dans la base de données.
+    """
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        # Exemple d'insertion des données
+        cursor.execute("""
+            INSERT INTO tickets (ticket_number, event_name, buyer_name)
+            VALUES (%s, %s, %s)
+        """, (data["details"]["ticket"]["number"], data["details"]["ticket"]["event"], data["details"]["buyer"]["firstName"]))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Erreur lors de l'insertion en base de données : {e}")
 
 def verify_signature(signature, body):
     """
@@ -44,6 +73,10 @@ def verify_signature(signature, body):
         print(f"Erreur lors de la vérification de la signature : {e}")
         return False
 
+@app.route('/')
+def home():
+    return "Bienvenue sur l'API de Webhooks ! Utilisez POST pour envoyer des webhooks à /webhook."
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """
@@ -54,15 +87,18 @@ def webhook():
     if not signature:
         return jsonify({"error": "Signature manquante"}), 400
 
-    body = request.get_data(as_text=True)
+    #body = request.get_data(as_text=True)
 
     # Vérifier la signature
-    if not verify_signature(signature, body):
-        return jsonify({"error": "Signature invalide"}), 401
+    #if not verify_signature(signature, body):
+    #    return jsonify({"error": "Signature invalide"}), 401
 
     # Traiter les données du webhook
     data = request.json
     print("Données reçues :", data)  # À remplacer par la logique de persistance
+
+    # Sauvegarder les données dans la base de données
+    save_to_db(data)
 
     # Répondre avec un succès
     return jsonify({"status": "success"}), 200
