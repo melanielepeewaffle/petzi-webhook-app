@@ -1,4 +1,6 @@
 # Serveur Flask qui écoutera les requêtes POST du webhook
+import logging
+import os
 from flask import Flask, request, jsonify
 import hmac
 import hashlib
@@ -8,8 +10,7 @@ import psycopg2
 app = Flask(__name__)
 
 # Clé secrète partagée avec Petzi (à configurer dans l'interface Petzi)
-# SECRET = os.getenv("PETZI_SECRET", "default_secret")  # Valeur par défaut en cas d'absence
-SECRET = "AEeyJhbGciOiJIUzUxMiIsImlzcyI6"
+SECRET = os.getenv("PETZI_SECRET", "default_secret")  # Valeur par défaut en cas d'absence
 
 # Configuration de la base de données
 DB_CONFIG = {
@@ -28,16 +29,17 @@ def save_to_db(data):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        # Exemple d'insertion des données
         cursor.execute("""
             INSERT INTO tickets (ticket_number, event_name, buyer_name)
             VALUES (%s, %s, %s)
         """, (data["details"]["ticket"]["number"], data["details"]["ticket"]["event"], data["details"]["buyer"]["firstName"]))
         conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Erreur lors de la sauvegarde des données dans la base de données : {e}")
+    finally:
         cursor.close()
         conn.close()
-    except Exception as e:
-        print(f"Erreur lors de l'insertion en base de données : {e}")
 
 def verify_signature(signature, body):
     """
