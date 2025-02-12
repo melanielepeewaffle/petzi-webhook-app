@@ -1,7 +1,7 @@
 # Serveur Flask qui écoutera les requêtes POST du webhook
 import logging
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, json, render_template, request, jsonify
 import hmac
 import hashlib
 import psycopg2
@@ -127,17 +127,19 @@ def get_tickets():
 
 @app.route('/dashboard')
 def dashboard():
-    """
-    Affiche un dashboard avec les données des tickets reçus
-    """
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         cursor.execute("SELECT id, ticket_number, event_name, buyer_name FROM tickets")
         tickets = cursor.fetchall()
         conn.close()
+        
+        # Transformer les tuples en objets JSON pour l'affichage
+        tickets_json = json.dumps([{
+            "id": t[0], "ticket_number": t[1], "event_name": t[2], "buyer_name": t[3]
+        } for t in tickets])
 
-        return render_template('dashboard.html', tickets=tickets)
+        return render_template('index.html', tickets=tickets_json)
     except Exception as e:
         logging.error(f"Erreur lors de la récupération des tickets : {e}")
         return jsonify({"error": "Erreur interne"}), 500
