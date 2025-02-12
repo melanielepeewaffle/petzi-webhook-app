@@ -9,17 +9,16 @@ import psycopg2
 app = Flask(__name__)
 
 # Clé secrète partagée avec Petzi (à configurer dans l'interface Petzi)
-SECRET = os.getenv("PETZI_SECRET", "default_secret")  # Valeur par défaut en cas d'absence
+SECRET = os.getenv("PETZI_SECRET", "default_secret")
 
 # Configuration de la base de données
 DB_CONFIG = {
     "dbname": "petzi_db",
     "user": "user",
     "password": "password",
-    "host": "db",  # "db" est le nom du service dans docker-compose.yml
+    "host": "db",
     "port": "5432"
 }
-
 
 def save_to_db(data):
     """
@@ -83,10 +82,6 @@ def verify_signature(signature, body):
         logging.error(f"Erreur lors de la vérification de la signature : {e}")
         return False
 
-@app.route('/')
-def home():
-    return "Bienvenue sur l'API de Webhooks ! Utilisez POST pour envoyer des webhooks à /webhook."
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """
@@ -104,7 +99,6 @@ def webhook():
 
     # Traiter les données du webhook
     data = request.json
-    print("Données reçues :", data)  # À remplacer par la logique de persistance
 
     # Sauvegarder les données dans la base de données
     save_to_db(data)
@@ -112,20 +106,7 @@ def webhook():
     # Répondre avec un succès
     return jsonify({"status": "success"}), 200
 
-@app.route('/tickets', methods=['GET'])
-def get_tickets():
-    try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, ticket_number, event_name, buyer_name FROM tickets")
-        tickets = cursor.fetchall()
-        conn.close()
-        return jsonify([{"id": t[0], "ticket_number": t[1], "event_name": t[2], "buyer_name": t[3]} for t in tickets]), 200
-    except Exception as e:
-        logging.error(f"Erreur lors de la récupération des tickets : {e}")
-        return jsonify({"error": "Erreur interne"}), 500
-
-@app.route('/dashboard')
+@app.route('/')
 def dashboard():
     try:
         conn = psycopg2.connect(**DB_CONFIG)
@@ -143,6 +124,10 @@ def dashboard():
     except Exception as e:
         logging.error(f"Erreur lors de la récupération des tickets : {e}")
         return jsonify({"error": "Erreur interne"}), 500
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("404.html"), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
