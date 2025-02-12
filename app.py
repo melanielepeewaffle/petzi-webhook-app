@@ -1,6 +1,7 @@
 # Serveur Flask qui écoutera les requêtes POST du webhook
 import logging
 import os
+import subprocess
 from flask import Flask, json, render_template, request, jsonify
 import hmac
 import hashlib
@@ -128,6 +129,44 @@ def dashboard():
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template("404.html"), 404
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    if "file" not in request.files:
+        return jsonify({"error": "Aucun fichier reçu"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "Fichier invalide"}), 400
+
+    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(file_path)
+
+    try:
+        # Exécuter le simulateur et récupérer sa sortie
+        result = subprocess.run(["python", file_path, "http://localhost:5000/webhook", SECRET], capture_output=True, text=True)
+
+        if result.returncode == 0:
+            return jsonify({
+                "status": "success",
+                "message": "✅ Webhook simulé avec succès ! Les données ont été envoyées et enregistrées en base.",
+                "details": result.stdout
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Erreur lors de l'exécution du script. Vérifiez la console pour plus de détails.",
+                "details": result.stderr
+            }), 500
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "🚨 Une erreur inattendue est survenue lors de l'exécution du script.",
+            "details": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

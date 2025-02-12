@@ -47,6 +47,22 @@
                 <tbody id="ticketsTableBody"></tbody>
             </table>
         </div>
+
+        <!-- Zone de dépôt du fichier -->
+        <div class="bg-white p-6 rounded-lg shadow-md mt-8">
+            <h2 class="text-xl font-semibold mb-4">📂 Uploader un fichier Webhook</h2>
+            
+            <div id="dropZone" class="border-dashed border-2 border-gray-300 p-6 text-center cursor-pointer bg-gray-100">
+                <p class="text-gray-700">📥 Glissez-déposez votre fichier ici ou cliquez pour sélectionner un fichier</p>
+                <input type="file" id="fileInput" class="hidden">
+            </div>
+
+            <p id="fileStatus" class="text-sm text-gray-600 mt-2"></p>
+
+            <button id="uploadButton" class="w-full bg-green-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-green-700 mt-4" disabled>
+                🚀 Exécuter le Webhook
+            </button>
+        </div>
     </div>
 
     <!-- Vue.js -->
@@ -102,6 +118,51 @@
                     }
                 }
             });
+        });
+
+        const dropZone = document.querySelector("#dropZone");
+        const fileInput = document.querySelector("#fileInput");
+        const fileStatus = document.querySelector("#fileStatus");
+        const uploadButton = document.querySelector("#uploadButton");
+        let uploadedFile = null;
+
+        dropZone.addEventListener("click", () => fileInput.click());
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.classList.add("bg-gray-200");
+        });
+        dropZone.addEventListener("dragleave", () => dropZone.classList.remove("bg-gray-200"));
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.classList.remove("bg-gray-200");
+            uploadedFile = e.dataTransfer.files[0];
+            fileStatus.innerText = `✅ Fichier prêt : ${uploadedFile.name}`;
+            uploadButton.disabled = false;
+        });
+
+        fileInput.addEventListener("change", (e) => {
+            uploadedFile = e.target.files[0];
+            fileStatus.innerText = `✅ Fichier prêt : ${uploadedFile.name}`;
+            uploadButton.disabled = false;
+        });
+
+        uploadButton.addEventListener("click", async () => {
+            if (!uploadedFile) return;
+
+            const formData = new FormData();
+            formData.append("file", uploadedFile);
+
+            try {
+                const response = await fetch("/upload", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const result = await response.json();
+                fileStatus.innerText = `📩 Réponse : ${JSON.stringify(result, null, 2)}`;
+            } catch (error) {
+                fileStatus.innerText = "❌ Erreur lors de l'envoi du fichier.";
+            }
         });
     </script>
 </body>
