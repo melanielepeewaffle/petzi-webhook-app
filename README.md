@@ -18,3 +18,11 @@ Documentation Petzi sur Cyberlearn
 1. Architecture orientée service. Votre service pourra être intégré dans une application composite.
 2. Base de données relationnelle optionnelle, mais les données provenant de petzi doivent être persistée.
 3. Utilisation docker et docker compose recommandée.
+
+### installation et utilisation
+1. Cloner le repository
+2. Installer Docker et Docker Compose
+3. Démarrer Docker Desktop
+4. Se déplacer dans le projet (ex. : PS C:\temp> cd .\petzi-webhook-app)
+5. Puis exécuter Docker Compose (ex. : PS C:\temp\petzi-webhook-app> docker-compose up -d --build)
+6. Aller sur http://localhost:5000/
